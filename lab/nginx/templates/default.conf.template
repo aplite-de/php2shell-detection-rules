@@ -1,0 +1,13 @@
+# Rendered by the nginx image entrypoint (envsubst on defined vars only).
+
+upstream php_fpm {
+    server ${FPM_HOST}:9000;
+}
+
+# Level 1 extended access log. Never logged: body, Cookie, Authorization, query string.
+log_format lab_json escape=json '{"time":"$time_iso8601","client":"$remote_addr","xff":"$http_x_forwarded_for","method":"$request_method","uri":"$uri","proto":"$server_protocol","status":$status,"bytes_in":$request_length,"bytes_out":$bytes_sent,"duration_s":$request_time,"upstream_time":"$upstream_response_time","upstream_status":"$upstream_status","connection":$connection,"connection_requests":$connection_requests,"content_type":"$content_type","content_length":"$content_length","transfer_encoding":"$http_transfer_encoding","ua":"$http_user_agent","request_id":"$request_id"}';
+
+server {
+    listen 80;
+    include /etc/nginx/lab/site.conf;
+}

@@ -1,0 +1,80 @@
+name: php2shell-lab
+
+# Isolation: one internal network (no egress, no published ports).
+# Traffic is sent from the `traffic` container; logs land in ./logs/<service>/.
+
+x-php: &php
+  networks: [lab]
+  mem_limit: 768m
+  restart: "no"
+
+x-nginx: &nginx
+  image: nginx:${NGINX_VERSION}
+  networks: [lab]
+  restart: "no"
+
+services:
+  apache-vuln:
+    <<: *php
+    build: { context: ., dockerfile: apache/Dockerfile, args: { PHP_VERSION: "${PHP_VULN}" } }
+    image: php2shell-lab/apache:${PHP_VULN}
+    volumes:
+      - ./app:/var/www/html:ro
+      - ./logs/apache-vuln:/var/log/apache2
+
+  apache-fixed:
+    <<: *php
+    build: { context: ., dockerfile: apache/Dockerfile, args: { PHP_VERSION: "${PHP_FIXED}" } }
+    image: php2shell-lab/apache:${PHP_FIXED}
+    volumes:
+      - ./app:/var/www/html:ro
+      - ./logs/apache-fixed:/var/log/apache2
+
+  fpm-vuln:
+    <<: *php
+    build: { context: ., dockerfile: fpm/Dockerfile, args: { PHP_VERSION: "${PHP_VULN}" } }
+    image: php2shell-lab/fpm:${PHP_VULN}
+    volumes:
+      - ./app:/var/www/html:ro
+      - ./logs/fpm-vuln:/var/log/php-fpm
+
+  fpm-fixed:
+    <<: *php
+    build: { context: ., dockerfile: fpm/Dockerfile, args: { PHP_VERSION: "${PHP_FIXED}" } }
+    image: php2shell-lab/fpm:${PHP_FIXED}
+    volumes:
+      - ./app:/var/www/html:ro
+      - ./logs/fpm-fixed:/var/log/php-fpm
+
+  nginx-vuln:
+    <<: *nginx
+    environment: { FPM_HOST: fpm-vuln }
+    depends_on: [fpm-vuln]
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/lab:/etc/nginx/lab:ro
+      - ./app:/var/www/html:ro
+      - ./logs/nginx-vuln:/var/log/nginx
+
+  nginx-fixed:
+    <<: *nginx
+    environment: { FPM_HOST: fpm-fixed }
+    depends_on: [fpm-fixed]
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/lab:/etc/nginx/lab:ro
+      - ./app:/var/www/html:ro
+      - ./logs/nginx-fixed:/var/log/nginx
+
+  traffic:
+    build: { context: ., dockerfile: traffic/Dockerfile }
+    image: php2shell-lab/traffic
+    profiles: [tools]
+    networks: [lab]
+    volumes:
+      - ./logs:/logs
+    depends_on: [apache-vuln, apache-fixed, nginx-vuln, nginx-fixed]
+
+networks:
+  lab:
+    internal: true

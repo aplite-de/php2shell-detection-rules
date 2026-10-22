@@ -30,6 +30,7 @@ php2shell-detection-rules/
 │   ├── 01-suspicious-form-posts.spl
 │   ├── 02-memory-errors-and-worker-crashes.spl
 │   └── 03-php-starting-a-shell.spl
+├── lab/              # Docker lab that reproduces the log signals
 ├── LICENSE
 └── README.md
 ```
@@ -42,11 +43,21 @@ Every platform gets the same three queries.
 
 | Query | Looks for | Data source | Severity |
 | --- | --- | --- | --- |
-| 01 Suspicious form POSTs | Multipart POSTs to URLs that never take uploads, chunked multipart bodies, form bodies over 1 MB, and bursts of multipart POSTs from one source | Web server access logs | Medium |
-| 02 Memory errors and worker crashes | Out-of-memory errors raised before any script ran (`in Unknown on line 0`) and crashing PHP workers | PHP and web server error logs | Medium |
+| 01 Suspicious form POSTs | Multipart POSTs to URLs that never take uploads: chunked bodies, bursts from one source, and POSTs that fail with a 5xx. The attack body is small, so size is only one of several triggers | Web server access logs | Medium |
+| 02 Memory errors and worker crashes | Out-of-memory errors raised before any script ran (`Allowed memory size ... in Unknown on line 0`), plus the PHP-FPM worker dying as a result (exit code 70, or an nginx 502). A segfault is flagged separately as possible corruption | PHP, PHP-FPM and web server error logs | Medium |
 | 03 PHP starting a shell | A PHP or web server process starting a shell, script interpreter or download tool | EDR (endpoint detection and response) process events | High |
 
 Query 03 is the clearest sign that an attack worked. The queries match on behavior, not on exploit tool names such as `php2shell` in the user agent, because tool names are easy to change.
+
+## Lab
+
+The [`lab/`](lab/) folder has a small Docker setup that reproduces every signal
+these queries look for. It runs Apache with mod_php and nginx with PHP-FPM, each in
+a vulnerable (PHP 8.4.26) and a patched (8.4.27) version, and sends the attack's
+request shape at them so you can see the difference in the logs. It drives PHP into
+the out-of-memory failure and stops there, it does not run any exploit. Use it to
+understand the signals, or to test the queries against logs you generated yourself
+before trusting them on production data. See [`lab/README.md`](lab/README.md).
 
 ## Before You Start
 
@@ -78,13 +89,13 @@ Run each query once with the time range starting on 20 October 2026, when detail
 
 - Table, index and data stream names are placeholders. Change them to match your setup.
 - Add your real upload URLs to the upload path list in query 01 (`KnownUploadPaths` in Sentinel, the `NOT IN` list in Elastic, the `IN` list in Splunk).
-- The thresholds (10 multipart POSTs from one source in 10 minutes, form bodies over 1 MB) are starting points.
-- Query 02 leaves out normal in-script memory errors and timeouts, because they are too common to alert on. Check them during triage.
+- The thresholds (10 multipart POSTs from one source in 10 minutes, form bodies over 1 MB) are starting points. Note the attack body itself is small, around a few hundred KB, so it is caught by the chunked, burst and 5xx conditions rather than by size.
+- Query 02 leaves out normal in-script memory errors and timeouts, because they are too common to alert on. Check them during triage. The worker-exit and nginx-502 rows are supporting signals: strongest when they line up in time with the out-of-memory error.
 - Query 03 skips `sendmail`, which PHP's `mail()` function starts through `sh`. Some apps also start shells for image or PDF tools, so compare the results with what each host did before 20 October.
 
 ## Status
 
-We tested these queries in our lab. Your logs and setup will differ, so test them on your own data before you turn them into alerts. Issues and pull requests are welcome.
+We built the queries against the lab in [`lab/`](lab/) and tuned them to the signals it produces on vulnerable and patched servers. Your logs and setup will differ, so test them on your own data before you turn them into alerts. Issues and pull requests are welcome.
 
 ## References
 

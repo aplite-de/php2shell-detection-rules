@@ -1,7 +1,8 @@
 // PHP2Shell (CVE-2026-109618, CVE-2026-109619)
 // Query 01. Suspicious form POSTs in web server access logs.
-// Finds multipart POSTs to URLs that never take uploads, chunked multipart bodies,
-// form bodies over 1 MB and bursts of multipart POSTs from one source.
+// Finds multipart POSTs to URLs that never take uploads: chunked bodies, bursts
+// from one source, and POSTs that fail with a 5xx. The attack body is small (a few
+// hundred KB in our lab), so a large body is only one of several triggers.
 // Data      nginx or Apache access logs in the format from log-formats/. Reads event.original, so turn on
 //           "Preserve original event" in the integration, or parse ct, te and reqlen at ingest.
 // Schedule  Save as an ES|QL detection rule that runs every hour. The time range comes from the rule
@@ -26,5 +27,7 @@ FROM logs-nginx.access-*, logs-apache.access-*
         paths = VALUES(url.path),
         user_agents = VALUES(user_agent.original)
   BY source.ip, host.name, window
-| WHERE chunked_multipart > 0 OR large_forms > 0 OR multipart_posts >= 10
+// Chunked, oversized, a burst, or a multipart POST that errored out. The memory
+// crash surfaces here as a 5xx, so one failing multipart POST is enough to flag.
+| WHERE chunked_multipart > 0 OR large_forms > 0 OR multipart_posts >= 10 OR (multipart_posts > 0 AND server_errors > 0)
 | SORT multipart_posts DESC
