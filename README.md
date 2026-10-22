@@ -13,7 +13,7 @@ Two critical bugs in the PHP core allow unauthenticated remote code execution (R
 ## Repo Structure
 
 ```
-php2shell-detection/
+php2shell-detection-rules/
 ├── log-formats/
 │   ├── nginx.conf
 │   └── apache.conf
