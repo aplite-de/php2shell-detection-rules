@@ -1,4 +1,4 @@
-# PHP2Shell Detection
+# PHP2Shell Detection Rules
 
 Detection queries for PHP2Shell (CVE-2026-109618 and CVE-2026-109619) in Microsoft Sentinel, Elastic and Splunk.
 
