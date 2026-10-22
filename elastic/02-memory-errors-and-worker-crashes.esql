@@ -1,0 +1,15 @@
+// PHP2Shell (CVE-2026-109618, CVE-2026-109619)
+// Query 02. Memory errors outside any script and crashing PHP workers.
+// Normal in-script memory errors and timeouts are left out on purpose. Check them during triage.
+// Data      nginx and Apache error logs. Add your PHP-FPM log data stream. With nginx, PHP errors
+//           usually land in the nginx error log as "FastCGI sent in stderr".
+// Schedule  Save as an ES|QL detection rule that runs every hour. For the first run, start on 20 October 2026.
+// Severity  Medium
+// Tuning    Change the data streams.
+FROM logs-nginx.error-*, logs-apache.error-*
+| WHERE (message LIKE "*in Unknown on line 0*" AND (message LIKE "*Allowed memory size of*" OR message LIKE "*Out of memory (allocated*"))
+     OR message LIKE "*exited on signal 11*" OR message LIKE "*exit signal Segmentation fault*"
+| EVAL signal = CASE(message LIKE "*in Unknown on line 0*", "Memory error before any script ran", "Worker crash")
+| KEEP @timestamp, host.name, signal, message
+| SORT @timestamp DESC
+| LIMIT 1000
