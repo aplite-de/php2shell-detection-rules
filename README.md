@@ -1,4 +1,5 @@
 # PHP2Shell Detection Rules
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
 Detection queries for PHP2Shell (CVE-2026-109618 and CVE-2026-109619) in Microsoft Sentinel, Elastic and Splunk.
 
